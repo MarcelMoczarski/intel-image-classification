@@ -1,0 +1,64 @@
+# This is a TOML document
+
+title = "Training configuration"
+
+[mode]
+gpu = true
+
+[paths]
+tmp_data_path = "./tmp_files"
+kaggle_json_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Remote_Colab_SSH/.keys"
+
+
+[general]
+num_epochs = 1000
+num_classes = 10
+valid_split = 0.2
+loss_func = "cross_entropy"
+optimizer= "Adam"
+arch = "Model_CNN"
+CNN = true
+resume = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/Template_Project/checkpoints/2022-04-15/run_002/model__Arch-Model_CNN_bs-64_valid_loss_001.pt"
+
+[source]
+source = "kaggle"
+set = "puneet6060/intel-image-classification"
+build_set_from_folder = true
+shuffle = true
+
+[source.transforms]
+Resize = [124, 124]
+ToTensor = ""
+
+[hyperparams]
+batch_size = 64
+lr = 1e-05
+
+#call callbacks alwasys like this: callbacks.*
+[callbacks.recorder]
+monitor = ["valid_acc", "valid_loss", "train_loss"]
+verbose = true
+
+[callbacks.earlystopping]
+monitor = "valid_loss"
+patience = 10
+min_delta = 1e-10
+
+[callbacks.checkpoints]
+monitor = "valid_loss"
+
+ckp_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/Template_Project/checkpoints" #has to be in project_folder
+#no_time_path = "ckp_dir"
+
+save_model = true
+save_history = true
+history_format = "parquet" #smaller for large datasets, faster reading
+
+min_delta = 1e-10
+
+use_last_run = true
+detailed_name = true
+debug_timestamp = "001"
+
+[callbacks.tensorboard]
+logdir = "./tmp_files"
