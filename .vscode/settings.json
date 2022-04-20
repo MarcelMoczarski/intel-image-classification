@@ -2,5 +2,7 @@
     "jupyter.jupyterServerType": "local",
     "cSpell.words": [
         "pytz"
-    ]
+    ],
+    "python.linting.mypyEnabled": true,
+    "python.linting.enabled": true
 }

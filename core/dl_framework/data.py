@@ -1,13 +1,12 @@
 import os
 import shutil
 from pathlib import Path
+from torchvision import transforms
+from PIL import Image
+# from sklearn.model_selection import train_test_split
+# from torch.utils.data import Dataset, DataLoader
 
-import numpy as np
-import torchvision
-from sklearn.model_selection import train_test_split
-
-
-def download_data(setup_config):
+def download_data(setup_config: dict) -> None:
     if setup_config["s_source"] == "kaggle":
         kaggle_json_file = setup_config["p_kaggle_json_path"] +  "/kaggle.json"
         root_path = Path("/root/.kaggle")
@@ -18,47 +17,35 @@ def download_data(setup_config):
             kaggle.api.authenticate()
             kaggle.api.dataset_download_files(setup_config["s_set"], path=setup_config["p_tmp_data_path"], unzip=True)
 
+class CustomDataset(Dataset):
+    def __init__(self, data_path, transform=[]) -> None:
+        self.data_path = data_path
+        self.transform = transform
+        self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
+        y_classes = [y.name for y in Path(data_path).glob("*")]
+        self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
+
+    def __len__(self):
+        return len(self.x)
+
+    def __getitem__(self, idx):
+        xs = Image.open(self.x[idx])
+        if self.transform:
+            xs = transforms.Compose(self.transform)(xs)
+        ys_class = self.x[idx].parent.name
+        ys = self.classes_to_label[ys_class]
+        return xs, ys
+
+class DataBunch():
+    def __init__(self, train_dl, valid_dl, c) -> None:
+        self.train_dl = train_dl
+        self.valid_dl = valid_dl
+        self.c = c
     
-
-# class Dataset():
-#     # transforms?
-#     def __init__(self, x, y, transform=None):
-#         self.x = x
-#         self.y = y
-#         self.transform = transform
-
-#     def __len__(self):
-#         return len(self.x)
-
-#     def __getitem__(self, i):
-#         if self.transform:
-#             self.x = self.transform(x)
-#         return self.x[i], self.y[i]
-
-
-# class DataLoader():
-#     # shuffle? num_workers?
-#     def __init__(self, ds, bs, drop_last=True):
-#         self.dataset = ds
-#         self.bs = bs
-#         self.drop_last = drop_last
-#         self._drop_length = len(self.dataset) - bs * \
-#             int(len(self.dataset) // bs)
-
-#     def __len__(self):
-#         if self.drop_last:
-#             length = np.floor(len(self.dataset) / self.bs)
-#         else:
-#             length = np.ceil(len(self.dataset) / self.bs)
-#         return int(length)
-
-#     def __iter__(self):
-#         if self.drop_last:
-#             length = len(self.dataset) - self._drop_length
-#         else:
-#             length = len(self.dataset)
-#         for i in range(0, length, self.bs):
-#             yield self.dataset[i:i+self.bs]
+    @property
+    def train_ds(self) -> DataLoader:
+        return self.train_dl
+    
 
 
 # class DataBunch():
