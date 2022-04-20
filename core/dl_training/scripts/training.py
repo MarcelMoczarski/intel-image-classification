@@ -15,7 +15,7 @@ def main(config_path):
     
     setup_config = read_config(toml.load(config_path))
     
-    x_train, y_train, x_test, y_test = get_dataset(setup_config)
+    # x_train, y_train, x_test, y_test = get_dataset(setup_config)
 
     #train_ds, test_ds = Dataset(x_train, y_train), Dataset(x_test, y_test)
 

@@ -8,25 +8,8 @@ from sklearn.model_selection import train_test_split
 
 
 def get_dataset(setup_config, filespath=None):
-    source, dataset = setup_config["s_source"], setup_config["s_set"]
-    save_path, kaggle_json_path = setup_config["p_tmp_data_path"], setup_config["p_kaggle_json_path"]
-    CNN = setup_config["g_CNN"]
-    build_set_from_folder = setup_config["s_build_set_from_folder"]
-    shuffle = setup_config["s_shuffle"]
 
-    
-    if source == "torchvision":
-        dataset = getattr(torchvision.datasets, dataset)
-        train_set = dataset(save_path, train=True, download=True)
-        test_set = dataset(save_path, train=False, download=True)
-        x_train, y_train = train_set.data / 255, train_set.targets
-        x_test, y_test = test_set.data / 255, test_set.targets
-
-        if not CNN:
-            x_train = x_train.reshape((len(x_train), -1))
-            x_test = x_test.reshape((len(x_test), -1))
-            
-        return x_train, y_train, x_test, y_test
+    return x_train, y_train, x_test, y_test
 
     if source == "kaggle":
         kaggle_json_path += "/kaggle.json"
