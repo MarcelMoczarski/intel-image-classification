@@ -3,7 +3,8 @@
     "cSpell.words": [
         "pytz"
     ],
-    "python.linting.mypyEnabled": true,
+    "python.linting.mypyEnabled": false,
     "python.linting.enabled": true,
-    "mypy.runUsingActiveInterpreter": true
+    "mypy.runUsingActiveInterpreter": true,
+    "python.linting.pylintEnabled": true
 }

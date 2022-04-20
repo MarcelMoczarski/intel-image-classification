@@ -1,14 +1,22 @@
+"""_summary_
+
+Returns:
+    _type_: _description_
+"""
 import os
 import shutil
+import typing
 from pathlib import Path
-from torchvision import transforms
-from PIL import Image
-# from sklearn.model_selection import train_test_split
-# from torch.utils.data import Dataset, DataLoader
 
-def download_data(setup_config: dict) -> None:
+from PIL import Image
+from torchvision import transforms
+
+# from sklearn.model_selection import train_test_split
+from torch.utils.data import Dataset, DataLoader
+
+def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
     if setup_config["s_source"] == "kaggle":
-        kaggle_json_file = setup_config["p_kaggle_json_path"] +  "/kaggle.json"
+        kaggle_json_file: str = setup_config["p_kaggle_json_path"] +  "/kaggle.json"
         root_path = Path("/root/.kaggle")
         root_path.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(kaggle_json_file, root_path/"kaggle.json")
@@ -18,7 +26,7 @@ def download_data(setup_config: dict) -> None:
             kaggle.api.dataset_download_files(setup_config["s_set"], path=setup_config["p_tmp_data_path"], unzip=True)
 
 class CustomDataset(Dataset):
-    def __init__(self, data_path, transform=[]) -> None:
+    def __init__(self, data_path: str, transform=[]) -> None:
         self.data_path = data_path
         self.transform = transform
         self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
