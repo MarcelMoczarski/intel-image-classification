@@ -1,3 +1,4 @@
+.mypy_cache
 tmp_files
 **/__pycache__
 **/*egg-info

@@ -11,25 +11,23 @@
 # import plotly.graph_objects as go
 # import pytz
 # from plotly.subplots import make_subplots
-# from typing import Dict
-def read_config(a: str) -> int:
-    b: str = a
-    return b
-# def read_config(config_file: Dict) -> Dict:
-#     setup_config = {}
-#     for key, value in config_file.items():
-#         if key == "title":
-#             continue
-#         else:
-#             for subkey, subval in value.items():
-#                 if type(subval) != dict:
-#                     key_name = f"{key[0]}_{subkey}"
-#                     setup_config[key_name] = subval
-#                 else:
-#                     for subsubkey, subsubval in subval.items():
-#                         key_name = f"{key[0]}_{subkey[0]}_{subsubkey}"
-#                         setup_config[key_name] = subsubval
-#     return setup_config
+import typing
+
+def read_config(config_file: typing.Dict[str, typing.Any]) -> typing.Dict[str, typing.Any]:
+    setup_config: typing.Dict[str, typing.Any] = {}
+    for key, value in config_file.items():
+        if key == "title":
+            continue
+        else:
+            for subkey, subval in value.items():
+                if type(subval) != dict:
+                    key_name = f"{key[0]}_{subkey}"
+                    setup_config[key_name] = subval
+                else:
+                    for subsubkey, subsubval in subval.items():
+                        key_name = f"{key[0]}_{subkey[0]}_{subsubkey}"
+                        setup_config[key_name] = subsubval
+    return setup_config
 
 
 # def get_history(ckp_path, monitor, fileformat=["csv"]):

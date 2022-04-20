@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+import typing
 import click
 import toml
 # from core.dl_framework.data import download_data
@@ -9,14 +9,15 @@ import torch
 
 @click.command()
 @click.argument("config_path", default="./configs/default_train_config.toml", type=click.Path(exists=True))
-
 def main(config_path: str) -> None:
     torch.manual_seed(1)
-    read_config("s")
-    # setup_config = read_config(toml.load(config_path))
+    setup_config: typing.Dict[str, int] = read_config(toml.load(config_path))
+    print(setup_config)
     # download_data(setup_config)
-    print("hjoi")
-    
+    # test: typing.Dict[str, str] = {"as" : 1}
+    # test = typing.Dict[str, str]
+    # a: test = {"a" : int(2)} 
+    # b: typing.Dict[str, str] = {"as" : 1}
     # x_train, y_train, x_test, y_test = get_dataset(setup_config)
 
     #train_ds, test_ds = Dataset(x_train, y_train), Dataset(x_test, y_test)

@@ -4,5 +4,6 @@
         "pytz"
     ],
     "python.linting.mypyEnabled": true,
-    "python.linting.enabled": true
+    "python.linting.enabled": true,
+    "mypy.runUsingActiveInterpreter": true
 }
