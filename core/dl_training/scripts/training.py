@@ -39,6 +39,8 @@ def main(config_path: str) -> None:
     # learn = Learner(train_ds, setup_config)
 
     # learn.fit(setup_config["g_num_epochs"])
+def test_func(arg):
+    print(arg)
 
 if __name__ == "__main__":
     main()

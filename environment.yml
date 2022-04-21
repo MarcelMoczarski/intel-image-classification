@@ -1,0 +1,13 @@
+---
+name: datascience
+channels:
+    - fastai
+    - pytorch
+dependencies:
+  - python>=3.7
+  - pytorch>=1.6
+  - torchvision<0.10.0
+  - cudatoolkit=10.2
+  - pip
+  - pip:
+    - -e .

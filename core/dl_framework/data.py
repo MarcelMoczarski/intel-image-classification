@@ -7,7 +7,7 @@ import os
 import shutil
 import typing
 from pathlib import Path
-
+import sys 
 from PIL import Image
 from torchvision import transforms
 
@@ -16,10 +16,11 @@ from torch.utils.data import Dataset, DataLoader
 
 def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
     if setup_config["s_source"] == "kaggle":
-        kaggle_json_file: str = setup_config["p_kaggle_json_path"] +  "/kaggle.json"
-        root_path = Path("/root/.kaggle")
-        root_path.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(kaggle_json_file, root_path/"kaggle.json")
+        if "google.colab" in sys.modules:
+            kaggle_json_file: str = setup_config["p_kaggle_json_path"] +  "/kaggle.json"
+            root_path = Path("/root/.kaggle")
+            root_path.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(kaggle_json_file, root_path/"kaggle.json")
         if len(os.listdir(setup_config["p_tmp_data_path"])) <= 1:
             import kaggle
             kaggle.api.authenticate()
