@@ -7,37 +7,47 @@ import os
 import shutil
 import typing
 from pathlib import Path
-import sys 
+import sys
 from PIL import Image
 from torchvision import transforms
 
 # from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 
+
 def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
     if setup_config["s_source"] == "kaggle":
-        if "google.colab" in sys.modules:
-            kaggle_json_file: str = setup_config["p_kaggle_json_path"] +  "/kaggle.json"
+        if len(os.listdir(setup_config["p_tmp_data_path"])) <= 1:
+            kaggle_json_file: str = (
+            setup_config["p_kaggle_json_path"] + "/kaggle.json"
+            )
             root_path = Path("/root/.kaggle")
             root_path.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(kaggle_json_file, root_path/"kaggle.json")
-        if len(os.listdir(setup_config["p_tmp_data_path"])) <= 1:
+            shutil.copyfile(kaggle_json_file, root_path / "kaggle.json")
+            
             import kaggle
             kaggle.api.authenticate()
-            kaggle.api.dataset_download_files(setup_config["s_set"], path=setup_config["p_tmp_data_path"], unzip=True)
+            kaggle.api.dataset_download_files(
+                setup_config["s_set"],
+                path=setup_config["p_tmp_data_path"],
+                unzip=True,
+            )
+
 
 class CustomDataset(Dataset):
-    def __init__(self, data_path: str, transform=[]) -> None:
+    def __init__(self, data_path: str, transform: list = []) -> None:
         self.data_path = data_path
         self.transform = transform
-        self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
+        self.x = sorted(
+            [x for x in Path(data_path).rglob("*.jpg") if x.is_file()]
+        )
         y_classes = [y.name for y in Path(data_path).glob("*")]
         self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.x)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> tuple:
         xs = Image.open(self.x[idx])
         if self.transform:
             xs = transforms.Compose(self.transform)(xs)
@@ -46,15 +56,14 @@ class CustomDataset(Dataset):
         return xs, ys
 
 class DataBunch():
-    def __init__(self, train_dl, valid_dl, c) -> None:
+    def __init__(self, train_dl: DataLoader, valid_dl: DataLoader, c: int) -> None:
         self.train_dl = train_dl
         self.valid_dl = valid_dl
         self.c = c
-    
+
     @property
     def train_ds(self) -> DataLoader:
         return self.train_dl
-    
 
 
 # class DataBunch():
@@ -106,5 +115,3 @@ class DataBunch():
 #             data = [data[0].dataset, data[1].dataset]
 #     data = DataBunch(*get_dls(data[0], data[1], bs), c)
 #     return data
-
-        
