@@ -33,8 +33,17 @@ def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
                 unzip=True,
             )
 
-
+def data_pipeline(data_path: str, transform: list = []) -> DataBunch:
+    data_ds = CustomDataset(data_path, transform)
+    
+    
+    
 class CustomDataset(Dataset):
+    """Dataset class for loading jpg files
+
+    Args:
+        CustomDataset (Dataset): data_path, transform list
+    """
     def __init__(self, data_path: str, transform: list = []) -> None:
         self.data_path = data_path
         self.transform = transform
