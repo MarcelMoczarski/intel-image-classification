@@ -38,14 +38,14 @@ def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
 
 
 def data_pipeline(rel_data_path: str, config_file: typing.Dict) -> DataBunch:
-    """pipeline that creates learner from files in rel_data_path and with parameters specified in configfile
+    """pipeline that creates databunch from files in rel_data_path and with parameters specified in configfile
 
     Args:
         rel_data_path (str): path to data
         config_file (typing.Dict): config file
 
     Returns:
-        DataBunch: _description_
+        DataBunch: returns databunch containing train and valid dataloaders
     """
     data_path = Path(config_file["p_tmp_data_path"]) / Path(rel_data_path)
     data_ds = CustomDataset(data_path, get_transforms(config_file))
@@ -119,7 +119,7 @@ class CustomDataset(Dataset):
         CustomDataset (Dataset): data_path, transform list
     """
 
-    def __init__(self, data_path: str, transform: list = None) -> None:
+    def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
         self.data_path = data_path
         self.transform = transform
         self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
@@ -146,14 +146,6 @@ class DataBunch:
         self.train_dl = train_dl
         self.valid_dl = valid_dl
         self.c = c
-
-    @property
-    def train_dl(self) -> DataLoader:
-        return self.train_dl
-
-    @property
-    def train_dl(self) -> DataLoader:
-        return self.valid_dl
 
 
 # class DataBunch():
