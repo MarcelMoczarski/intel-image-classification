@@ -10,24 +10,25 @@ import shutil
 import sys
 import typing
 from pathlib import Path
-
+import numpy as np
 from PIL import Image
+
 # from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+from sklearn.model_selection import train_test_split
 
 
 def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
     if setup_config["s_source"] == "kaggle":
         if len(os.listdir(setup_config["p_tmp_data_path"])) <= 1:
-            kaggle_json_file: str = (
-            setup_config["p_kaggle_json_path"] + "/kaggle.json"
-            )
+            kaggle_json_file: str = setup_config["p_kaggle_json_path"] + "/kaggle.json"
             root_path = Path("/root/.kaggle")
             root_path.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(kaggle_json_file, root_path / "kaggle.json")
-            
+
             import kaggle
+
             kaggle.api.authenticate()
             kaggle.api.dataset_download_files(
                 setup_config["s_set"],
@@ -35,34 +36,96 @@ def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
                 unzip=True,
             )
 
-def data_pipeline(data_path: str, transform: list = []) -> DataBunch:
-    data_ds = CustomDataset(data_path, transform)
-    
-def get_transforms(config_file: typing.Dict) -> transforms: 
-    config_transforms = [(key.split("_", 2)[-1], value) for key, value in config_file.items() if "s_t_" in key]
-    transform = []   
+
+def data_pipeline(rel_data_path: str, config_file: typing.Dict) -> DataBunch:
+    """pipeline that creates learner from files in rel_data_path and with parameters specified in configfile
+
+    Args:
+        rel_data_path (str): path to data
+        config_file (typing.Dict): config file
+
+    Returns:
+        DataBunch: _description_
+    """
+    data_path = Path(config_file["p_tmp_data_path"]) / Path(rel_data_path)
+    data_ds = CustomDataset(data_path, get_transforms(config_file))
+
+    num_classes = len(data_ds.classes_to_label)
+
+    train_idx, valid_idx = get_samplers(data_ds.targets, config_file["g_valid_size"], stratify=True)
+    train_dl = DataLoader(
+        data_ds, batch_size=config_file["h_batch_size"], sampler=train_idx, drop_last=True
+    )
+    valid_dl = DataLoader(data_ds, batch_size=config_file["h_batch_size"], sampler=valid_idx)
+
+    data = DataBunch(train_dl, valid_dl, num_classes)
+    return data
+
+
+def get_samplers(
+    targets: np.ndarray, valid_size: float, stratify: bool = True
+) -> tuple[np.ndarray, np.ndarray]:
+    """Returns train and valid indices
+
+    Args:
+        targets (np.ndarray): target array
+        valid_size (float): split size
+        stratify (bool, optional): stratify if data has class imbalances. Defaults to True.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: returns shuffled indices vor train and valid loaders
+    """
+    if stratify:
+        train_idx, valid_idx = train_test_split(
+            range(len(targets)),
+            shuffle=True,
+            test_size=valid_size,
+            stratify=targets,
+            random_state=1,
+        )
+    else:
+        train_idx, valid_idx = train_test_split(
+            range(len(targets)), shuffle=True, test_size=valid_size, random_state=1
+        )
+
+    return np.array(train_idx), np.array(valid_idx)
+
+
+def get_transforms(config_file: typing.Dict) -> list:
+    """gets list of transforms from configfile
+
+    Args:
+        config_file (typing.Dict): configfile
+
+    Returns:
+        list: list containing all transforms specified in configfile
+    """
+    config_transforms = [
+        (key.split("_", 2)[-1], value) for key, value in config_file.items() if "s_t_" in key
+    ]
+    transform = []
     for t in config_transforms:
         if t[1]:
             transform.append(getattr(transforms, t[0])(t[1]))
         else:
             transform.append(getattr(transforms, t[0])())
     return transform
-   
-    
+
+
 class CustomDataset(Dataset):
     """Dataset class for loading jpg files
 
     Args:
         CustomDataset (Dataset): data_path, transform list
     """
-    def __init__(self, data_path: str, transform: list = []) -> None:
+
+    def __init__(self, data_path: str, transform: list = None) -> None:
         self.data_path = data_path
         self.transform = transform
-        self.x = sorted(
-            [x for x in Path(data_path).rglob("*.jpg") if x.is_file()]
-        )
+        self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
         y_classes = [y.name for y in Path(data_path).glob("*")]
         self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
+        self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
 
     def __len__(self) -> int:
         return len(self.x)
@@ -75,15 +138,22 @@ class CustomDataset(Dataset):
         ys = self.classes_to_label[ys_class]
         return xs, ys
 
-class DataBunch():
+
+class DataBunch:
+    """databunch class is bucket for train and valid dataloaders and for number of classes"""
+
     def __init__(self, train_dl: DataLoader, valid_dl: DataLoader, c: int) -> None:
         self.train_dl = train_dl
         self.valid_dl = valid_dl
         self.c = c
 
     @property
-    def train_ds(self) -> DataLoader:
+    def train_dl(self) -> DataLoader:
         return self.train_dl
+
+    @property
+    def train_dl(self) -> DataLoader:
+        return self.valid_dl
 
 
 # class DataBunch():
