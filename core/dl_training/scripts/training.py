@@ -31,6 +31,7 @@ def main(config_path: str) -> None:
 
     download_data(setup_config)
     
+    # data_pipeline()
     
     
     # test: typing.Dict[str, str] = {"as" : 1}

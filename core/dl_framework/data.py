@@ -3,16 +3,18 @@
 Returns:
     _type_: _description_
 """
+from __future__ import annotations
+
 import os
 import shutil
+import sys
 import typing
 from pathlib import Path
-import sys
-from PIL import Image
-from torchvision import transforms
 
+from PIL import Image
 # from sklearn.model_selection import train_test_split
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
 
 def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
@@ -36,7 +38,16 @@ def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
 def data_pipeline(data_path: str, transform: list = []) -> DataBunch:
     data_ds = CustomDataset(data_path, transform)
     
-    
+def get_transforms(config_file: typing.Dict) -> transforms: 
+    config_transforms = [(key.split("_", 2)[-1], value) for key, value in config_file.items() if "s_t_" in key]
+    transform = []   
+    for t in config_transforms:
+        if t[1]:
+            transform.append(getattr(transforms, t[0])(t[1]))
+        else:
+            transform.append(getattr(transforms, t[0])())
+    return transform
+   
     
 class CustomDataset(Dataset):
     """Dataset class for loading jpg files
