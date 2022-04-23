@@ -8,6 +8,7 @@ title = "Training configuration"
 [paths]
 tmp_data_path = "./tmp_files"
 kaggle_json_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Remote_Colab_SSH/.keys"
+local_data_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification"
 
 
 [general]

@@ -111,25 +111,6 @@ def get_transforms(config_file: typing.Dict) -> list:
             transform.append(getattr(transforms, t[0])())
     return transform
 
-class CustomDataset(Dataset):
-    def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
-        self.data_path = data_path
-        self.transform = transform
-        self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
-        y_classes = [y.name for y in Path(data_path).glob("*")]
-        self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
-        self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
-        self.file = h5py.File("./train_imgs.hdf5", "r")
-        
-    def __len__(self) -> int:
-        return len(self.x)
-
-    def __getitem__(self, idx: int) -> tuple:
-        xs = self.file["train_imgs.hdf5"][idx]
-        if self.transform:
-            xs = transforms.Compose([transforms.ToTensor()])(xs)
-        return xs, self.targets[idx]
-    
 # class CustomDataset(Dataset):
 #     def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
 #         self.data_path = data_path
@@ -138,16 +119,35 @@ class CustomDataset(Dataset):
 #         y_classes = [y.name for y in Path(data_path).glob("*")]
 #         self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
 #         self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
-#         self.transformed_imgs = []
-#         pbar_imgs_list = tqdm(self.x, total=len(self.x), leave=True)
-#         for img in pbar_imgs_list:
-#             self.transformed_imgs.append(transforms.Compose(transform)(Image.open(img)))
-
+#         self.file = h5py.File("./train_imgs.hdf5", "r")
+        
 #     def __len__(self) -> int:
 #         return len(self.x)
 
 #     def __getitem__(self, idx: int) -> tuple:
-#         return self.transformed_imgs[idx], self.targets[idx]
+#         xs = self.file["train_imgs.hdf5"][idx]
+#         if self.transform:
+#             xs = transforms.Compose([transforms.ToTensor()])(xs)
+#         return xs, self.targets[idx]
+    
+class CustomDataset(Dataset):
+    def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
+        self.data_path = data_path
+        self.transform = transform
+        self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
+        y_classes = [y.name for y in Path(data_path).glob("*")]
+        self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
+        self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
+        self.transformed_imgs = []
+        pbar_imgs_list = tqdm(self.x, total=len(self.x), leave=True)
+        for img in pbar_imgs_list:
+            self.transformed_imgs.append(transforms.Compose(transform)(Image.open(img)))
+
+    def __len__(self) -> int:
+        return len(self.x)
+
+    def __getitem__(self, idx: int) -> tuple:
+        return self.transformed_imgs[idx], self.targets[idx]
 
 # class CustomDataset(Dataset):
 #     """Dataset class for loading jpg files
