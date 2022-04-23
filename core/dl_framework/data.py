@@ -17,7 +17,7 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
-
+from tqdm import tqdm
 
 def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
     if setup_config["s_source"] == "kaggle":
@@ -111,14 +111,7 @@ def get_transforms(config_file: typing.Dict) -> list:
             transform.append(getattr(transforms, t[0])())
     return transform
 
-
 class CustomDataset(Dataset):
-    """Dataset class for loading jpg files
-
-    Args:
-        CustomDataset (Dataset): data_path, transform list
-    """
-
     def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
         self.data_path = data_path
         self.transform = transform
@@ -126,17 +119,42 @@ class CustomDataset(Dataset):
         y_classes = [y.name for y in Path(data_path).glob("*")]
         self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
         self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
+        self.transformed_imgs = []
+        pbar_imgs_list = tqdm(self.x, total=len(self.x), leave=True)
+        for img in pbar_imgs_list:
+            self.transformed_imgs.append(transforms.Compose(transform)(Image.open(img)))
 
     def __len__(self) -> int:
         return len(self.x)
 
     def __getitem__(self, idx: int) -> tuple:
-        xs = Image.open(self.x[idx])
-        if self.transform:
-            xs = transforms.Compose(self.transform)(xs)
-        ys_class = self.x[idx].parent.name
-        ys = self.classes_to_label[ys_class]
-        return xs, ys
+        return self.transformed_imgs[idx], self.targets[idx]
+
+# class CustomDataset(Dataset):
+#     """Dataset class for loading jpg files
+
+#     Args:
+#         CustomDataset (Dataset): data_path, transform list
+#     """
+
+#     def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
+#         self.data_path = data_path
+#         self.transform = transform
+#         self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
+#         y_classes = [y.name for y in Path(data_path).glob("*")]
+#         self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
+#         self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
+
+#     def __len__(self) -> int:
+#         return len(self.x)
+
+#     def __getitem__(self, idx: int) -> tuple:
+#         xs = Image.open(self.x[idx])
+#         if self.transform:
+#             xs = transforms.Compose(self.transform)(xs)
+#         ys_class = self.x[idx].parent.name
+#         ys = self.classes_to_label[ys_class]
+#         return xs, ys
 
 
 class DataBunch:
