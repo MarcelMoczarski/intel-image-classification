@@ -47,12 +47,17 @@ def data_pipeline(rel_data_path: str, config_file: typing.Dict) -> DataBunch:
     Returns:
         DataBunch: returns databunch containing train and valid dataloaders
     """
-    data_path = Path(config_file["p_tmp_data_path"]) / Path(rel_data_path)
+    # data_path = Path(config_file["p_tmp_data_path"]) / Path(rel_data_path)
+    
+    # train_data_path = "seg_train/seg_train"
+    data_path = Path(config_file["p_local_data_path"]) / "processed_files/proc_train.h5"
+
+    
     data_ds = CustomDataset(data_path, get_transforms(config_file))
 
-    num_classes = len(data_ds.classes_to_label)
+    num_classes = 6
 
-    train_idx, valid_idx = get_samplers(data_ds.targets, config_file["g_valid_size"], stratify=True)
+    train_idx, valid_idx = get_samplers(data_ds.y, config_file["g_valid_size"], stratify=True)
     train_dl = DataLoader(
         data_ds, batch_size=config_file["h_batch_size"], sampler=train_idx, drop_last=True
     )
@@ -111,69 +116,29 @@ def get_transforms(config_file: typing.Dict) -> list:
             transform.append(getattr(transforms, t[0])())
     return transform
 
-# class CustomDataset(Dataset):
-#     def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
-#         self.data_path = data_path
-#         self.transform = transform
-#         self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
-#         y_classes = [y.name for y in Path(data_path).glob("*")]
-#         self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
-#         self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
-#         self.file = h5py.File("./train_imgs.hdf5", "r")
-        
-#     def __len__(self) -> int:
-#         return len(self.x)
-
-#     def __getitem__(self, idx: int) -> tuple:
-#         xs = self.file["train_imgs.hdf5"][idx]
-#         if self.transform:
-#             xs = transforms.Compose([transforms.ToTensor()])(xs)
-#         return xs, self.targets[idx]
     
 class CustomDataset(Dataset):
     def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
         self.data_path = data_path
         self.transform = transform
-        self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
-        y_classes = [y.name for y in Path(data_path).glob("*")]
-        self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
-        self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
-        self.transformed_imgs = []
-        pbar_imgs_list = tqdm(self.x, total=len(self.x), leave=True)
-        for img in pbar_imgs_list:
-            self.transformed_imgs.append(transforms.Compose(transform)(Image.open(img)))
+        with h5py.File(data_path, "r") as f:
+            keys = []
+            for key in f.keys():
+                keys.append(key)
+            self.x = f[keys[0]][:]
+            self.y = f[keys[1]][:]
 
     def __len__(self) -> int:
         return len(self.x)
 
     def __getitem__(self, idx: int) -> tuple:
-        return self.transformed_imgs[idx], self.targets[idx]
-
-# class CustomDataset(Dataset):
-#     """Dataset class for loading jpg files
-
-#     Args:
-#         CustomDataset (Dataset): data_path, transform list
-#     """
-
-#     def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
-#         self.data_path = data_path
-#         self.transform = transform
-#         self.x = sorted([x for x in Path(data_path).rglob("*.jpg") if x.is_file()])
-#         y_classes = [y.name for y in Path(data_path).glob("*")]
-#         self.classes_to_label = dict(zip(y_classes, range(len(y_classes))))
-#         self.targets = np.array([self.classes_to_label[x.parent.name] for x in self.x])
-
-#     def __len__(self) -> int:
-#         return len(self.x)
-
-#     def __getitem__(self, idx: int) -> tuple:
-#         xs = Image.open(self.x[idx])
-#         if self.transform:
-#             xs = transforms.Compose(self.transform)(xs)
-#         ys_class = self.x[idx].parent.name
-#         ys = self.classes_to_label[ys_class]
-#         return xs, ys
+        xs = self.x[idx]
+        ys = self.y[idx]
+        
+        if self.transform:
+            xs = transforms.Compose(self.transform)(xs)
+            
+        return xs, ys
 
 
 class DataBunch:

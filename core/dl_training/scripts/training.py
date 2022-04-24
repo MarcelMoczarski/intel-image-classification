@@ -1,6 +1,7 @@
 """placeholder for meaningful docstring"""
 import typing
 import sys
+
 # from pathlib import Path
 
 import click
@@ -25,15 +26,12 @@ def main(config_path: str) -> None:
         config_path (str): _description_
     """
     torch.manual_seed(1)
-    setup_config: typing.Dict[str, typing.Any] = read_config(
-        toml.load(config_path)
-    )
+    setup_config: typing.Dict[str, typing.Any] = read_config(toml.load(config_path))
 
     download_data(setup_config)
-    
+
     # data_pipeline()
-    
-    
+
     # test: typing.Dict[str, str] = {"as" : 1}
     # test = typing.Dict[str, str]
     # a: test = {"a" : int(2)}
