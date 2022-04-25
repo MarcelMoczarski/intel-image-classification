@@ -23,7 +23,7 @@ import subprocess
 
 def download_data(
     config_file: typing.Dict[str, typing.Any],
-    rel_data_set: str = "seg_train/seg_train",
+    img_data_set: str = "seg_train/seg_train",
     set_name: str = "train",
     all_transforms: bool = False,
 ) -> None:
@@ -55,7 +55,7 @@ def download_data(
                 "python",
                 Path(config_file["p_subprocess_scripts"]) / "store_files.py",
                 "-p",
-                rel_data_set,
+                img_data_set,
                 "-n",
                 set_name,
                 "-a",
@@ -66,14 +66,14 @@ def download_data(
 
 def data_pipeline(
     config_file: typing.Dict,
-    rel_data_set: str = "seg_train/seg_train",
+    img_data_set: str = "seg_train/seg_train",
     set_name: str = "train",
     all_transforms: bool = False,
 ) -> DataBunch:
-    """pipeline that creates databunch from files in rel_data_path and with parameters specified in configfile
+    """pipeline that creates databunch from files in img_data_path and with parameters specified in configfile
 
     Args:
-        rel_data_path (str): path to data
+        img_data_path (str): path to data
         config_file (typing.Dict): config file
 
     Returns:
@@ -81,17 +81,17 @@ def data_pipeline(
     """
 
     download_data(
-        config_file, rel_data_set, set_name, all_transforms
+        config_file, img_data_set, set_name, all_transforms
     )
 
     data_path = (
         Path(config_file["p_local_data_path"]) / "processed_files" / set_name
     ).with_suffix(".h5")
 
-    data_ds = CustomDataset(data_path, get_transforms(config_file), True)
+    data_ds = CustomDataset(data_path, get_transforms(config_file), all_transforms)
 
-    num_classes = 6
-
+    num_classes = len(np.unique(data_ds.y, return_counts=True)[1])
+    
     train_idx, valid_idx = get_samplers(
         data_ds.y, config_file["g_valid_size"], stratify=True
     )
@@ -185,8 +185,8 @@ class CustomDataset(Dataset):
             keys = []
             for key in f.keys():
                 keys.append(key)
-            self.x = f[keys[0]][:]
-            self.y = f[keys[1]][:]
+            self.x = f[keys[0]][:100]
+            self.y = f[keys[1]][:100]
 
     def __len__(self) -> int:
         return len(self.x)

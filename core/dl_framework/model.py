@@ -110,8 +110,8 @@ class Model_2(nn.Module):
         return self.model(x)
 
 
-def get_model(data, arch, lr, c, opt, device):
-    input_shape = data.train_ds.x.shape[1]
-    net = globals()[arch](input_shape, c).to(device)
+def get_model(data, arch, lr, opt, device):
+    input_shape = data.train_dl.dataset.x.shape[1]
+    net = globals()[arch](input_shape, data.c).to(device)
     optim = getattr(torch.optim, opt)
     return net, optim(net.parameters(), lr=lr)

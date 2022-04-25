@@ -22,19 +22,19 @@ import torch
 @click.option(
     "--img_data_path", "-p", default="/seg_train/seg_train", type=str
 )
-@click.option("--name", "-n", default="processed_train", type=str)
+@click.option("--set_name", "-n", default="processed_train", type=str)
 @click.option("--compress", "-c", default=True, type=bool)
 @click.option("--all_transforms", "-a", default=False, type=bool)
 
 def main(
-    config_file_path: Path, img_data_path: str, name: str, compress: bool, all_transforms: bool
+    config_file_path: Path, img_data_path: str, set_name: str, compress: bool, all_transforms: bool
 ) -> None:
     """Script that stores all imgs files as numpy array and saves it as h5 file.
 
     Args:
         config_file_path (Path): path to config file
         img_data_path (str): path to img files. all files of each class has to be stored in a seperate folder
-        name (str): name that is used as key for h5 file. data can be accessed via: <name>_x, <name>_y
+        set_name (str): set_name that is used as key for h5 file. data can be accessed via: <set_name>_x, <set_name>_y
         compress (bool): option to compress dataset with gzip
         all_transforms (bool): if true, all transforms are applied to the images
     """
@@ -73,9 +73,9 @@ def main(
         labels_arr = np.array(labels)
 
     with h5py.File(
-        Path(save_path / name).with_suffix(".h5"), "w", libver="latest"
+        Path(save_path / set_name).with_suffix(".h5"), "w", libver="latest"
     ) as f:
-        key_name = name.split("_")[-1]
+        key_name = set_name.split("_")[-1]
         if compress:
             f.create_dataset(
                 f"{key_name}_x",
