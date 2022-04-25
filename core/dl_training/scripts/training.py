@@ -26,7 +26,7 @@ def main(config_path: str) -> None:
         config_path (str): _description_
     """
     torch.manual_seed(1)
-    setup_config: typing.Dict[str, typing.Any] = read_config(toml.load(config_path))
+    read_config(toml.load(config_path))
 
     download_data(setup_config)
 

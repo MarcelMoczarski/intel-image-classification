@@ -10,34 +10,66 @@ import shutil
 import sys
 import typing
 from pathlib import Path
+
+import h5py
 import numpy as np
 from PIL import Image
-import h5py
-# from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-
-def download_data(setup_config: typing.Dict[str, typing.Any]) -> None:
-    if setup_config["s_source"] == "kaggle":
-        if len(os.listdir(setup_config["p_tmp_data_path"])) <= 1:
-            kaggle_json_file: str = setup_config["p_kaggle_json_path"] + "/kaggle.json"
-            root_path = Path("/root/.kaggle")
-            root_path.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(kaggle_json_file, root_path / "kaggle.json")
-
-            import kaggle
-
-            kaggle.api.authenticate()
-            kaggle.api.dataset_download_files(
-                setup_config["s_set"],
-                path=setup_config["p_tmp_data_path"],
-                unzip=True,
-            )
+import subprocess
 
 
-def data_pipeline(rel_data_path: str, config_file: typing.Dict) -> DataBunch:
+def download_data(
+    config_file: typing.Dict[str, typing.Any],
+    rel_data_set: str = "seg_train/seg_train",
+    set_name: str = "train",
+    all_transforms: bool = False,
+) -> None:
+    processed_file = (
+        Path(config_file["p_local_data_path"]) / "processed_files" / set_name
+    ).with_suffix(".h5")
+    
+    if not processed_file.exists():
+        if config_file["s_source"] == "kaggle":
+            if len(os.listdir(config_file["p_tmp_data_path"])) <= 1:
+                kaggle_json_file: str = (
+                    config_file["p_kaggle_json_path"] + "/kaggle.json"
+                )
+                root_path = Path("/root/.kaggle")
+                root_path.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(kaggle_json_file, root_path / "kaggle.json")
+
+                import kaggle
+
+                kaggle.api.authenticate()
+                kaggle.api.dataset_download_files(
+                    config_file["s_set"],
+                    path=config_file["p_tmp_data_path"],
+                    unzip=True,
+                )
+
+        subprocess.call(
+            [
+                "python",
+                Path(config_file["p_subprocess_scripts"]) / "store_files.py",
+                "-p",
+                rel_data_set,
+                "-n",
+                set_name,
+                "-a",
+                f"{all_transforms}",
+            ]
+        )
+
+
+def data_pipeline(
+    config_file: typing.Dict,
+    rel_data_set: str = "seg_train/seg_train",
+    set_name: str = "train",
+    all_transforms: bool = False,
+) -> DataBunch:
     """pipeline that creates databunch from files in rel_data_path and with parameters specified in configfile
 
     Args:
@@ -47,21 +79,31 @@ def data_pipeline(rel_data_path: str, config_file: typing.Dict) -> DataBunch:
     Returns:
         DataBunch: returns databunch containing train and valid dataloaders
     """
-    # data_path = Path(config_file["p_tmp_data_path"]) / Path(rel_data_path)
-    
-    # train_data_path = "seg_train/seg_train"
-    data_path = Path(config_file["p_local_data_path"]) / "processed_files/proc_train.h5"
 
-    
-    data_ds = CustomDataset(data_path, get_transforms(config_file))
+    download_data(
+        config_file, rel_data_set, set_name, all_transforms
+    )
+
+    data_path = (
+        Path(config_file["p_local_data_path"]) / "processed_files" / set_name
+    ).with_suffix(".h5")
+
+    data_ds = CustomDataset(data_path, get_transforms(config_file), True)
 
     num_classes = 6
 
-    train_idx, valid_idx = get_samplers(data_ds.y, config_file["g_valid_size"], stratify=True)
-    train_dl = DataLoader(
-        data_ds, batch_size=config_file["h_batch_size"], sampler=train_idx, drop_last=True
+    train_idx, valid_idx = get_samplers(
+        data_ds.y, config_file["g_valid_size"], stratify=True
     )
-    valid_dl = DataLoader(data_ds, batch_size=config_file["h_batch_size"], sampler=valid_idx)
+    train_dl = DataLoader(
+        data_ds,
+        batch_size=config_file["h_batch_size"],
+        sampler=train_idx,
+        drop_last=True,
+    )
+    valid_dl = DataLoader(
+        data_ds, batch_size=config_file["h_batch_size"], sampler=valid_idx
+    )
 
     data = DataBunch(train_dl, valid_dl, num_classes)
     return data
@@ -90,7 +132,10 @@ def get_samplers(
         )
     else:
         train_idx, valid_idx = train_test_split(
-            range(len(targets)), shuffle=True, test_size=valid_size, random_state=1
+            range(len(targets)),
+            shuffle=True,
+            test_size=valid_size,
+            random_state=1,
         )
 
     return np.array(train_idx), np.array(valid_idx)
@@ -106,7 +151,9 @@ def get_transforms(config_file: typing.Dict) -> list:
         list: list containing all transforms specified in configfile
     """
     config_transforms = [
-        (key.split("_", 2)[-1], value) for key, value in config_file.items() if "s_t_" in key
+        (key.split("_", 2)[-1], value)
+        for key, value in config_file.items()
+        if "s_t_" in key
     ]
     transform = []
     for t in config_transforms:
@@ -116,11 +163,24 @@ def get_transforms(config_file: typing.Dict) -> list:
             transform.append(getattr(transforms, t[0])())
     return transform
 
-    
+
 class CustomDataset(Dataset):
-    def __init__(self, data_path: typing.Union[str, Path], transform: list = None) -> None:
+    def __init__(
+        self,
+        data_path: typing.Union[str, Path],
+        transform: list = None,
+        all_transforms: bool = False,
+    ) -> None:
         self.data_path = data_path
-        self.transform = transform
+
+        if all_transforms:
+            self.transform = []
+        else:
+            if transform:
+                for t in transform:
+                    if not "Resize" in type(t).__name__:
+                        self.transform.append(t)
+
         with h5py.File(data_path, "r") as f:
             keys = []
             for key in f.keys():
@@ -134,17 +194,17 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple:
         xs = self.x[idx]
         ys = self.y[idx]
-        
         if self.transform:
             xs = transforms.Compose(self.transform)(xs)
-            
         return xs, ys
 
 
 class DataBunch:
     """databunch class is bucket for train and valid dataloaders and for number of classes"""
 
-    def __init__(self, train_dl: DataLoader, valid_dl: DataLoader, c: int) -> None:
+    def __init__(
+        self, train_dl: DataLoader, valid_dl: DataLoader, c: int
+    ) -> None:
         self.train_dl = train_dl
         self.valid_dl = valid_dl
         self.c = c
