@@ -17,7 +17,6 @@ implemented callbacks:
     Monitor: Tracks 
 """
 
-
 class Callback:
     """parent class for all Callbacks
     implements dummy methods
@@ -104,27 +103,6 @@ class CallbackHandler:
     def on_validate_end(self):
         for cb in self.cbs:
             cb.on_validate_end()
-
-
-# class CudaCallback(Callback):
-#     """Manages if data/ model is send to gpu or cpu
-
-#     Args:
-#         Callback (self): Implements alls methods
-#     """
-#     # def on_train_begin(self, epochs):
-#     #     if self.learn.gpu:
-#     #         # todo: error message if no gpu available
-#     #         self.learn.model = self.learn.model.to(self.learn.device)
-
-#     def on_batch_begin(self, batch):
-#         self.xb, self.yb = batch[0], batch[1]
-#         # todo: uncomment when CNN
-#         self.xb = self.xb.unsqueeze(1)
-#         if self.learn.gpu:
-#             self.xb = self.xb.to(self.learn.device)
-#             self.yb = self.yb.to(self.learn.device)
-#         self.batch = (self.xb, self.yb)
 
 
 class Recorder(Callback):

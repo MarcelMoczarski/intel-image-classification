@@ -173,6 +173,7 @@ class CustomDataset(Dataset):
     ) -> None:
         self.data_path = data_path
 
+        self.transform: list = []
         if all_transforms:
             self.transform = []
         else:
@@ -180,7 +181,7 @@ class CustomDataset(Dataset):
                 for t in transform:
                     if not "Resize" in type(t).__name__:
                         self.transform.append(t)
-
+            
         with h5py.File(data_path, "r") as f:
             keys = []
             for key in f.keys():
