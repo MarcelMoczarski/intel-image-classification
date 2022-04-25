@@ -43,7 +43,16 @@ def conv_block(img_size, n_in, nh, kernel_size, stride, padding, max_kernel=2):
     return modules, int(output_size)
 
 def get_model(data, arch, lr, opt, device):
-    in_c = 
-    net = globals()[arch](img.size, data.c).to(device)
+    data_shape = data.train_dl.dataset[0][0].shape
+    n_in = data_shape[0]
+    nh = arch[2]
+    n_out = data.c
+    
+    arch_model = arch[0]
+    arch_depth = arch[1]
+    
+    img_shape = data_shape[1]
     optim = getattr(torch.optim, opt)
+    
+    net = globals()[arch_model](n_in, n_out, nh, img_shape, arch_depth).to(device)
     return net, optim(net.parameters(), lr=lr)
