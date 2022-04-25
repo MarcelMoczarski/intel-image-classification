@@ -2,113 +2,45 @@ import torch
 from torch import nn
 
 
-class Model_CNN(nn.Module):
-    def __init__(self, n_in, n_out, nh=16):
-        super(Model_CNN, self).__init__()
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=3,
-                out_channels=16,
-                kernel_size=5,
-                stride=1,
-                padding=2
-            ),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),  # halves img dim
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=nh,
-                out_channels=2*nh,
-                kernel_size=5,
-                stride=1,
-                padding=2
-            ),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2)  # halves img dim
-        )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=2*nh,
-                out_channels=2*2*nh,
-                kernel_size=5,
-                stride=1,
-                padding=2
-            ),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2)  # halves img dim
-        )
+def conv_output_size(w, k=3, p=2, s=1):
+    return ((w - k + 2*p) / s + 1)
+
+def conv_block(img_size, n_in, nh, kernel_size, stride, padding, max_kernel=2):
+    modules = [
+    nn.Conv2d(n_in, nh, kernel_size, stride, padding),
+    nn.BatchNorm2d(nh),
+    nn.ReLU(),
+    nn.MaxPool2d(max_kernel)
+    ]
+    output_size = conv_output_size(img_size, k=kernel_size, p=padding, s=stride)
+    output_size = conv_output_size(output_size, k=max_kernel, p=0, s=max_kernel)
+    return modules, int(output_size)
+
+class CustomModel(nn.Module):
+    def __init__(self, n_in, n_out, nh, img_size, num_blocks, kernel_size=3, stride=1, padding=1):
+        super(CustomModel, self).__init__()
+        
+        modules_list = []
+
+        for n in range(num_blocks):
+            modules, output_size = conv_block(img_size, n_in, nh, kernel_size, stride, padding)
+            modules_list.extend(modules)
+            
+            img_size = output_size
+            n_in = nh
+            nh = 2*nh
+        self.conv = nn.Sequential(*modules_list)
+        output_size = output_size**2 * n_in
+
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(14400, n_out)
+            nn.Linear(output_size, n_out)
         )
-
+    
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
+        x = self.conv(x)
         out = self.fc(x)
         return out
-
-
-class Model_1(nn.Module):
-    def __init__(self, n_in, n_out, nh=8):
-        super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(n_in, nh),
-            nn.ReLU(),
-            nn.Linear(nh, n_out)
-            # nn.Linear(n_in, 128),
-            # nn.ReLU(),
-            # # nn.Dropout(p=0.2),
-
-            # nn.Linear(128, 64),
-            # nn.ReLU(),
-            # # nn.Dropout(p=0.2),
-
-            # nn.Linear(64, 32),
-            # nn.ReLU(),
-            # # nn.Dropout(p=0.2),
-
-            # nn.Linear(32, n_out)
-        )
-
-    def forward(self, x):
-        return self.model(x)
-
-
-class Model_2(nn.Module):
-    def __init__(self, n_in, n_out, nh=512):
-        super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(n_in, 8192),
-            nn.ReLU(),
-            nn.Linear(8192, 4096),
-            nn.ReLU(),
-            nn.Linear(4096, 2048),
-            nn.ReLU(),
-            nn.Linear(2048, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            # nn.Dropout(p=0.2),
-            nn.Linear(32, n_out)
-        )
-
-    def forward(self, x):
-        return self.model(x)
-
 
 def get_model(data, arch, lr, opt, device):
     input_shape = data.train_dl.dataset.x.shape[1]
