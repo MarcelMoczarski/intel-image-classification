@@ -9,9 +9,8 @@ gpu = true
 tmp_data_path = "./tmp_files"
 kaggle_json_path = "/mnt/f/Insync/Marcel_Moczarski/Data_Science/Google_Services/Remote_Colab_SSH/.keys"
 local_data_path = "/mnt/f/Insync/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification"
-#kaggle_json_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Remote_Colab_SSH/.keys"
-#local_data_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification"
 subprocess_scripts = "./core/dl_training/scripts"
+mount_point = "Marcel_Moczarski"
 
 [general]
 num_epochs = 1000

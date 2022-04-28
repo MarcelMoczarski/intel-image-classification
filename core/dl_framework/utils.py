@@ -33,8 +33,23 @@ def read_config(
                     for subsubkey, subsubval in subval.items():
                         key_name = f"{key[0]}_{subkey[0]}_{subsubkey}"
                         setup_config[key_name] = subsubval
+    setup_config = check_colab(setup_config)
     return setup_config
 
+def check_colab(config_file):
+    try:
+        import google.colab
+        in_colab = True
+    except:
+        in_colab = False
+
+    if in_colab:
+        for key, value in config_file.items():
+            if ("mnt" in str(value)) or ("content" in str(value)):
+                for i, part in enumerate(Path(value).parts):
+                    if part == config_file["p_mount_point"]:
+                        config_file[key] = (Path("/content/gdrive/MyDrive") / Path(*Path(config_file[key]).parts[i:])).as_posix()
+    return config_file                                        
 
 def get_history(ckp_path, monitor, fileformat=["csv"], browse_all_files=False):
     project_name = Path(os.getcwd()).name
