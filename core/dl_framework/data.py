@@ -190,8 +190,8 @@ class CustomDataset(Dataset):
             keys = []
             for key in f.keys():
                 keys.append(key)
-            self.x = f[keys[0]][:100]
-            self.y = f[keys[1]][:100]
+            self.x = f[keys[0]][:]
+            self.y = f[keys[1]][:]
          
 
     def __len__(self) -> int:
