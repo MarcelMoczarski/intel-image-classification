@@ -39,7 +39,7 @@ def main(
         all_transforms (bool): if true, all transforms are applied to the images
     """
     config_file = read_config(toml.load(config_file_path))
-    data_path = Path(config_file["p_tmp_data_path"]) / img_data_path
+    data_path = Path(config_file["p_tmp_data_path"]) / Path(img_data_path).relative_to(Path(img_data_path).anchor)
     save_path = Path(config_file["p_local_data_path"] + "/processed_files")
     save_path.mkdir(parents=True, exist_ok=True)
 
@@ -50,7 +50,7 @@ def main(
     pbar_imgs_list = tqdm(all_imgs, total=len(all_imgs), leave=True)
     resized_imgs = []
     labels = []
-    
+    print(data_path)
     if not all_transforms:
         for trans in transform:   
             if type(trans).__name__ == "Resize":

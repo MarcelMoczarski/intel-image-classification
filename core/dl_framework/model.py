@@ -1,13 +1,41 @@
 import torch
 from torch import nn
 
-3, 6, 16, 
-class CustomModel(nn.Module):
-    def __init__(self, n_in, n_out, nh, img_size, num_blocks, kernel_size=3, stride=1, padding=1):
-        super(CustomModel, self).__init__()
-        
-        modules_list = []
 
+class InceptionModule(nn.Module):
+    def __init__(self, in_channels, out_channels, *args):
+        super(InceptionModule, self).__init__()
+        relu = nn.ReLU()
+        self.branch1 = nn.Sequential(
+                  nn.Conv2d(in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0),
+                  relu)
+
+        conv3_1 = nn.Conv2d(in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
+        conv3_3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.branch2 = nn.Sequential(conv3_1, conv3_3,relu)
+
+        conv5_1 = nn.Conv2d(in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
+        conv5_5 = nn.Conv2d(out_channels, out_channels, kernel_size=5, stride=1, padding=2)
+        self.branch3 = nn.Sequential(conv5_1,conv5_5,relu)
+
+        max_pool_1 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        conv_max_1 = nn.Conv2d(in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
+        self.branch4 = nn.Sequential(max_pool_1, conv_max_1,relu)
+
+    def forward(self, input):
+        output1 = self.branch1(input)
+        output2 = self.branch2(input)
+        output3 = self.branch3(input)
+        output4 = self.branch4(input)
+        out = torch.cat([output1, output2, output3, output4], dim=1)
+        print(out.shape)
+        return out
+
+
+class CustomModel(nn.Module):
+    def __init__(self, n_in, n_out, nh, img_size, num_blocks, kernel_size=3, stride=1, padding=1):    
+        super(CustomModel, self).__init__()
+        modules_list = []
         for n in range(num_blocks):
             modules, output_size = conv_block(img_size, n_in, nh, kernel_size, stride, padding)
             modules_list.extend(modules)
@@ -23,7 +51,7 @@ class CustomModel(nn.Module):
             nn.Linear(output_size, n_out)
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv(x)
         out = self.fc(x)
         return out
@@ -56,3 +84,46 @@ def get_model(data, arch, lr, opt, device):
     
     net = globals()[arch_model](n_in, n_out, nh, img_shape, arch_depth).to(device)
     return net, optim(net.parameters(), lr=lr)
+
+class AlexNet(nn.Module):
+    def __init__(self, n_in, n_out, nh, img_size, num_blocks, kernel_size=3, stride=1, padding=1) -> None:
+        super(AlexNet, self).__init__()
+        self. n_in = n_in
+        self.c = n_out
+
+        self.features = nn.Sequential(
+            nn.Conv2d(n_in, 64, kernel_size=11, stride=4, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+
+            nn.Conv2d(64, 192, kernel_size=5, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )   
+        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(256 * 6 * 6, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            nn.Linear(4096, self.c),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x

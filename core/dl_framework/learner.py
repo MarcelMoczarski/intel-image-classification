@@ -1,6 +1,6 @@
 import pandas as pd
 import torch
-from core.dl_framework import loss_functions
+from core.dl_framework.loss_functions import loss_function
 from core.dl_framework.callbacks import get_callbackhandler
 from core.dl_framework.model import get_model
 from tqdm import tqdm
@@ -10,7 +10,7 @@ import torch
 class Container:
     def __init__(self, data, config_file):
         self.opt = config_file["g_optimizer"]
-        self.loss_func = getattr(loss_functions, config_file["g_loss_func"])
+
         self.bs = config_file["h_batch_size"]
         self.arch = [
             config_file["g_arch"],
@@ -27,6 +27,9 @@ class Container:
         self.model, self.opt = get_model(
             self.data, self.arch, self.lr, self.opt, self.device
         )
+
+        self.loss_func = loss_function(config_file, self.model)
+        
         self.do_stop = False
         self.resume = config_file["g_resume"]
 
@@ -64,10 +67,10 @@ class Learner:
             self.cbh.on_batch_end()
 
     def one_batch(self, batch):
-        xb, yb = batch
+        xb, yb, idx = batch
         xb, yb = xb.to(self.learn.device), yb.to(self.learn.device)
         out = self.learn.model(xb)
-        loss = self.learn.loss_func(out, yb)
+        loss = self.learn.loss_func.calc(out, yb)
         if not self.cbh.on_loss_end(loss, out, yb):
             return
         loss.backward()

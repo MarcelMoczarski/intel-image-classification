@@ -19,12 +19,12 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from tqdm import tqdm
 import subprocess
-
+import re
 
 def download_data(
     config_file: typing.Dict[str, typing.Any],
     img_data_set: str = "seg_train/seg_train",
-    set_name: str = "train",
+    set_name: str = "train_data",
     all_transforms: bool = False,
 ) -> None:
     processed_file = (
@@ -38,6 +38,8 @@ def download_data(
                     config_file["p_kaggle_json_path"] + "/kaggle.json"
                 )
                 root_path = Path("/root/.kaggle")
+                # root_path = Path("~/.kaggle")#only if local 
+
                 root_path.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(kaggle_json_file, root_path / "kaggle.json")
 
@@ -49,7 +51,6 @@ def download_data(
                     path=config_file["p_tmp_data_path"],
                     unzip=True,
                 )
-
         subprocess.call(
             [
                 "python",
@@ -158,7 +159,10 @@ def get_transforms(config_file: typing.Dict) -> list:
     transform = []
     for t in config_transforms:
         if t[1]:
-            transform.append(getattr(transforms, t[0])(t[1]))
+            if type(t[1]) is list:
+                transform.append(getattr(transforms, t[0])(*t[1]))
+            else:
+                transform.append(getattr(transforms, t[0])(t[1]))
         else:
             transform.append(getattr(transforms, t[0])())
     return transform
@@ -179,15 +183,16 @@ class CustomDataset(Dataset):
         else:
             if transform:
                 for t in transform:
-                    if not "Resize" in type(t).__name__:
+                    if not  re.search("Resize(?!.)", type(t).__name__):
                         self.transform.append(t)
-            
+
         with h5py.File(data_path, "r") as f:
             keys = []
             for key in f.keys():
                 keys.append(key)
-            self.x = f[keys[0]][:]
-            self.y = f[keys[1]][:]
+            self.x = f[keys[0]][:100]
+            self.y = f[keys[1]][:100]
+         
 
     def __len__(self) -> int:
         return len(self.x)
@@ -197,7 +202,8 @@ class CustomDataset(Dataset):
         ys = self.y[idx]
         if self.transform:
             xs = transforms.Compose(self.transform)(xs)
-        return xs, ys
+
+        return xs, ys, idx
 
 
 class DataBunch:

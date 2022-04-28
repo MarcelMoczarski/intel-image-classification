@@ -1,12 +1,12 @@
 ---
-name: datascience
+name: iic
 channels:
     - fastai
     - pytorch
 dependencies:
-  - python>=3.7
-  - pytorch>=1.6
-  - torchvision<0.10.0
+  - python
+  - pytorch
+  - torchvision
   - cudatoolkit=10.2
   - pip
   - pip:

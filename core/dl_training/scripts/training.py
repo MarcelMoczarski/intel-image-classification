@@ -17,7 +17,7 @@ from core.dl_framework.utils import read_config
     "--img_data_path", "-p", default="/seg_train/seg_train", type=str
 )
 @click.option("--set_name", "-n", default="train_data", type=str)
-@click.option("--all_transforms", "-a", default=True, type=bool)
+@click.option("--all_transforms", "-a", default=False, type=bool)
 def main(
     config_path: str, img_data_path: str, set_name: str, all_transforms: bool
 ) -> None:
@@ -28,7 +28,7 @@ def main(
     """
     torch.manual_seed(1)
     config_file = read_config(toml.load(config_path))
-
+    
     print("load data into memory...")
     data = data_pipeline(config_file, img_data_path, set_name, all_transforms)
 

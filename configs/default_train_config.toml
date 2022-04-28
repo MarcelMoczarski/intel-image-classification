@@ -7,57 +7,66 @@ gpu = true
 
 [paths]
 tmp_data_path = "./tmp_files"
-kaggle_json_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Remote_Colab_SSH/.keys"
-local_data_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification"
+kaggle_json_path = "/mnt/f/Insync/Marcel_Moczarski/Data_Science/Google_Services/Remote_Colab_SSH/.keys"
+local_data_path = "/mnt/f/Insync/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification"
+#kaggle_json_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Remote_Colab_SSH/.keys"
+#local_data_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification"
 subprocess_scripts = "./core/dl_training/scripts"
 
 [general]
-num_epochs = 10
+num_epochs = 1000
 valid_size = 0.2
 loss_func = "cross_entropy"
 optimizer= "Adam"
 arch = "CustomModel"
 arch_depth = 4
 hidden_layers = 16
-resume = false#"/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/Template_Project/checkpoints/2022-04-15/run_002/model__Arch-Model_CNN_bs-64_valid_loss_001.pt"
+resume = false#"/mnt/f/Insync/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification/checkpoints/2022-04-28/run_007/model_Arch-CustomModel_bs-64_valid_loss_001.pt"
+#resume = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification/checkpoints/2022-04-15/run_002/model_Arch-Model_CNN_bs-64_valid_loss_001.pt"
 
 [source]
 source = "kaggle"
 set = "puneet6060/intel-image-classification"
 
 [source.transforms]
-Resize = [124, 124]
+Resize = [[128, 128]]
+ToPILImage = "RGB"
+RandomHorizontalFlip = 1
+#RandomCrop = 104 
 ToTensor = []
+Normalize = [[0.4304, 0.4579, 0.4543], [0.2577, 0.2558, 0.2883]]
+
 
 [hyperparams]
 batch_size = 64
 lr = 1e-05
+l2_regularization = 0.001
 
-#call callbacks alwasys like this: callbacks.*
+#call callbacks alwasys like this: [callbacks.*]
 [callbacks.recorder]
-monitor = ["valid_acc", "valid_loss", "train_loss"]
+monitor = ["valid_acc", "valid_acc_per_class", "valid_loss", "train_loss"]
 verbose = true
 
-#[callbacks.earlystopping]
-#monitor = "valid_loss"
-#patience = 10
-#min_delta = 1e-10
+[callbacks.earlystopping]
+monitor = "valid_loss"
+patience = 50
+min_delta = 1e-10
 
-#[callbacks.checkpoints]
-#monitor = "valid_loss"
-
+[callbacks.checkpoints]
+monitor = "valid_loss"
+ckp_path = "/mnt/f/Insync/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification/checkpoints" #has to be in project_folder
 #ckp_path = "/content/gdrive/MyDrive/Marcel_Moczarski/Data_Science/Google_Services/Local_Drive_Storage/Conda_Envs/intel-image-classification/checkpoints" #has to be in project_folder
 #no_time_path = "ckp_dir"
 
-#save_model = true
-#save_history = true
-#history_format = "parquet" #smaller for large datasets, faster reading
+save_model = true
+save_history = true
+history_format = "csv" #smaller for large datasets, faster reading
 
-#min_delta = 1e-10
+min_delta = 1e-10
 
-#use_last_run = true
-#detailed_name = true
-#debug_timestamp = "001"
+use_last_run = true
+detailed_name = true
+debug_timestamp = "001"
 
-#[callbacks.tensorboard]
-#logdir = "./tmp_files"
+[callbacks.tensorboard]
+logdir = "./tmp_files/logdir"

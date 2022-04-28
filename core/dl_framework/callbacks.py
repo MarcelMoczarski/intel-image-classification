@@ -125,7 +125,9 @@ class Recorder(Callback):
             "train_loss": [],
             "valid_loss": [],
             "train_pred": [],
+            "train_pred_per_class": [],
             "valid_pred": [],
+            "valid_pred_per_class": [],
         }
         self.monitor = []
 
@@ -172,7 +174,9 @@ class Recorder(Callback):
             "train_loss": [],
             "valid_loss": [],
             "train_pred": [],
+            "train_pred_per_class": [],
             "valid_pred": [],
+            "valid_pred_per_class": [],
         }
 
         for mon in self.monitor:
@@ -181,7 +185,9 @@ class Recorder(Callback):
     def on_loss_end(self, loss, out, yb):
         self.yb = yb
         self.loss = loss
+
         self.out = out
+
         if self.learn.model.training:
             self.batch_vals["train_loss"].append(loss.item())
         else:
@@ -190,10 +196,15 @@ class Recorder(Callback):
     def on_batch_end(self):
         _, batch_pred = torch.max(self.out.data, 1)
         batch_correct = (batch_pred == self.yb).sum().item() / len(self.yb)
+
+        batch_correct_per_class = np.array([(((batch_pred == self.yb) * (self.yb == c)).float().sum() / (self.yb == c).sum()).cpu()for c in range(self.learn.data.c)])
+
         if self.learn.model.training:
             self.batch_vals["train_pred"].append(batch_correct)
+            self.batch_vals["train_pred_per_class"].append(batch_correct_per_class)
         else:
             self.batch_vals["valid_pred"].append(batch_correct)
+            self.batch_vals["valid_pred_per_class"].append(batch_correct_per_class)
 
     def on_epoch_end(self):
         for mon in self.monitor:
@@ -207,13 +218,17 @@ class Recorder(Callback):
         self.learn.history_raw = self.history
 
         for mon in self.monitor:
-            old_val = self.best_values[mon][2]
-            new_val = self.history[mon][-1]
-            comp = self.best_values[mon][0]
-            if comp(new_val, old_val):
-                self.best_values[mon][1] = self.best_values[mon][2]
-                self.best_values[mon][2] = new_val
-                self.learn.new_best_values[mon] = True
+            if not "per_class" in mon:
+                old_val = self.best_values[mon][2]
+                new_val = self.history[mon][-1]
+                comp = self.best_values[mon][0]
+                if comp(new_val, old_val):
+                    self.best_values[mon][1] = self.best_values[mon][2]
+                    self.best_values[mon][2] = new_val
+                    self.learn.new_best_values[mon] = True
+
+    def valid_acc_per_class(self):
+        return sum(self.batch_vals["valid_pred_per_class"], 0) / len(self.batch_vals["valid_pred_per_class"])
 
     def valid_acc(self):
         return sum(self.batch_vals["valid_pred"]) / len(self.batch_vals["valid_pred"])
@@ -225,12 +240,14 @@ class Recorder(Callback):
         return sum(self.batch_vals["train_loss"]) / len(self.batch_vals["train_loss"])
 
     def _print_console(self):
-
         out_string = f""
         out_string += f"epoch: {int(self.epoch)+1}/{self.epochs}\t["
         for key, val in self.history.items():
             if key != "epochs":
-                out_string += f"{key}: {val[-1]:.4f}\t"
+                if type(val[-1]) is np.ndarray:
+                    out_string += f"{key}: {np.array2string(val[-1])}\t"
+                else:
+                    out_string += f"{key}: {val[-1]:.4f}\t"
         out_string += f"train_time: {self._sec_conv_str(self.learn.train_time)}\t"
         print(out_string[:-1] + "]")
 
@@ -310,8 +327,9 @@ class Checkpoints(Callback):
 
         if self.detailed_name:
             self.save_name = (
-                f"_Arch-{self.learn.arch}_bs-{self.learn.bs}_{self.monitor}"
+                f"Arch-{self.learn.arch[0]}_bs-{self.learn.bs}_{self.monitor}"
             )
+  
         else:
             self.save_name = f""
 
@@ -357,7 +375,7 @@ class Checkpoints(Callback):
             df = pd.DataFrame(self.learn.history_raw).set_index("epochs")
             to_func = getattr(df.iloc[1:], "to_" + self.history_format)
             to_func(
-                Path(self.save_path / f"history{self.save_name}.{self.history_format}")
+                Path(self.save_path / f"history_{self.save_name}.{self.history_format}")
             )
 
     def create_checkpoint_path(self):
@@ -380,7 +398,10 @@ class Checkpoints(Callback):
             for path in curr_path.iterdir():
                 if path.is_dir():
                     subdirs.append(datetime.fromisoformat(path.name))
-            last_run_date = max(subdirs).strftime("%Y-%m-%d")
+            if subdirs:
+                last_run_date = max(subdirs).strftime("%Y-%m-%d")
+            else:
+                last_run_date = datetime_now
             curr_path = Path(curr_path / last_run_date)
 
         curr_path.mkdir(parents=True, exist_ok=True)
@@ -410,10 +431,11 @@ class Tensorboard(Callback):
         super().__init__(learn)
     
     def on_train_begin(self, epochs):
+        Path(self.logdir).mkdir(exist_ok=True, parents=True)
         self.writer = SummaryWriter(log_dir=self.logdir)
-        img, _ = next(iter(self.learn.data.train_dl))   
+        img, _, _ = next(iter(self.learn.data.train_dl))   
         
-        img = img.unsqueeze(1).to(self.learn.device)
+        img = img.to(self.learn.device)
         self.writer.add_graph(self.learn.model.to(self.learn.device), img)
         
     def on_epoch_end(self):
@@ -423,10 +445,12 @@ class Tensorboard(Callback):
             epoch = hist["epochs"][-1]
             if key != "epochs":
                 if "loss" in key:
-                    self.writer.add_scalar("loss/" + key, val[-1], epoch)
-                if "acc" in key:
-                    self.writer.add_scalar("acc/" + key, val[-1], epoch)
-                    
+                    self.writer.add_scalars("loss/" + key, {"0": val[-1]}, epoch)
+                if ("acc" in key) and (not "per_class" in key):
+                    self.writer.add_scalars("acc/" + key,{"0": val[-1]}, epoch)
+                if "per_class" in key:
+                    to_add = dict(zip(np.arange(self.learn.data.c).astype(str), val[-1]))
+                    self.writer.add_scalars("acc/" + key, to_add, epoch)
         
 def save_checkpoint(state, is_best, checkpoint_path):
     """save best and last pytorch model in checkpoint_path
