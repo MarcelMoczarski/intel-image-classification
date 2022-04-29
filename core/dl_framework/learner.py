@@ -8,7 +8,7 @@ import torch
 
 
 class Container:
-    def __init__(self, data, config_file):
+    def __init__(self, data, config_file, ext_model=None):
         self.opt = config_file["g_optimizer"]
 
         self.bs = config_file["h_batch_size"]
@@ -25,18 +25,20 @@ class Container:
 
         self.data = data
         self.model, self.opt = get_model(
-            self.data, self.arch, self.lr, self.opt, self.device
+            self.data, self.arch, self.lr, self.opt, self.device, ext_model
         )
+
 
         self.loss_func = loss_function(config_file, self.model)
         
         self.do_stop = False
         self.resume = config_file["g_resume"]
 
+        self.config_file = config_file
 
 class Learner:
-    def __init__(self, data, config_file):
-        self.learn = Container(data, config_file)
+    def __init__(self, data, config_file, ext_model=None):
+        self.learn = Container(data, config_file, ext_model)
         self.cbh = get_callbackhandler(config_file, self.learn)
         self.device = self.learn.device
 
@@ -67,11 +69,11 @@ class Learner:
             self.cbh.on_batch_end()
 
     def one_batch(self, batch):
-        xb, yb, idx = batch
+        xb, yb, sampler_idx = batch
         xb, yb = xb.to(self.learn.device), yb.to(self.learn.device)
         out = self.learn.model(xb)
         loss = self.learn.loss_func.calc(out, yb)
-        if not self.cbh.on_loss_end(loss, out, yb):
+        if not self.cbh.on_loss_end(loss, out, yb, sampler_idx):
             return
         loss.backward()
         self.learn.opt.step()

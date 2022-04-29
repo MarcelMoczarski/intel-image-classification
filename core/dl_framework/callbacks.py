@@ -9,6 +9,8 @@ import pandas as pd
 import pytz
 import torch
 from torch.utils.tensorboard import SummaryWriter
+from torchvision import transforms
+from torchvision.utils import make_grid
 
 """all checkpoints should be included at the moment
 
@@ -17,6 +19,7 @@ implemented callbacks:
     CudaCallback: Manages devices and where data is send to
     Monitor: Tracks 
 """
+
 
 class Callback:
     """parent class for all Callbacks
@@ -47,7 +50,7 @@ class Callback:
     def on_loss_begin(self):
         pass
 
-    def on_loss_end(self, loss, out, yb):
+    def on_loss_end(self, loss, out, yb, sampler_idx):
         self.loss = loss
 
     def on_step_begin(self):
@@ -91,9 +94,9 @@ class CallbackHandler:
         for cb in self.cbs:
             cb.on_batch_end()
 
-    def on_loss_end(self, loss, out, yb):
+    def on_loss_end(self, loss, out, yb, sampler_idx):
         for cb in self.cbs:
-            cb.on_loss_end(loss, out, yb)
+            cb.on_loss_end(loss, out, yb, sampler_idx)
         return self.learn.model.training
 
     def on_validate_begin(self):
@@ -141,7 +144,9 @@ class Recorder(Callback):
                 self.history,
                 self.best_values,
                 self.learn.train_time,
-            ) = load_checkpoint(self.learn.resume, self.learn.model, self.learn.opt)
+            ) = load_checkpoint(
+                self.learn.resume, self.learn.model, self.learn.opt
+            )
 
     def on_train_begin(self, epochs):
         self._starttime = time() - self.learn.train_time
@@ -183,11 +188,11 @@ class Recorder(Callback):
         for mon in self.monitor:
             self.learn.new_best_values[mon] = False
 
-    def on_loss_end(self, loss, out, yb):
-        self.yb = yb
+    def on_loss_end(self, loss, out, yb, sampler_idx):
         self.loss = loss
-
         self.out = out
+        self.yb = yb
+        self.sampler_idx = sampler_idx
 
         if self.learn.model.training:
             self.batch_vals["train_loss"].append(loss.item())
@@ -198,14 +203,26 @@ class Recorder(Callback):
         _, batch_pred = torch.max(self.out.data, 1)
         batch_correct = (batch_pred == self.yb).sum().item() / len(self.yb)
 
-        batch_correct_per_class = np.array([(((batch_pred == self.yb) * (self.yb == c)).float().sum() / (self.yb == c).sum()).cpu()for c in range(self.learn.data.c)])
+        batch_correct_per_class = np.array(
+            [
+                (
+                    ((batch_pred == self.yb) * (self.yb == c)).float().sum()
+                    / (self.yb == c).sum()
+                ).cpu()
+                for c in range(self.learn.data.c)
+            ]
+        )
 
         if self.learn.model.training:
             self.batch_vals["train_pred"].append(batch_correct)
-            self.batch_vals["train_pred_per_class"].append(batch_correct_per_class)
+            self.batch_vals["train_pred_per_class"].append(
+                batch_correct_per_class
+            )
         else:
             self.batch_vals["valid_pred"].append(batch_correct)
-            self.batch_vals["valid_pred_per_class"].append(batch_correct_per_class)
+            self.batch_vals["valid_pred_per_class"].append(
+                batch_correct_per_class
+            )
 
     def on_epoch_end(self):
         for mon in self.monitor:
@@ -229,16 +246,24 @@ class Recorder(Callback):
                     self.learn.new_best_values[mon] = True
 
     def valid_acc_per_class(self):
-        return sum(self.batch_vals["valid_pred_per_class"], 0) / len(self.batch_vals["valid_pred_per_class"])
+        return sum(self.batch_vals["valid_pred_per_class"], 0) / len(
+            self.batch_vals["valid_pred_per_class"]
+        )
 
     def valid_acc(self):
-        return sum(self.batch_vals["valid_pred"]) / len(self.batch_vals["valid_pred"])
+        return sum(self.batch_vals["valid_pred"]) / len(
+            self.batch_vals["valid_pred"]
+        )
 
     def valid_loss(self):
-        return sum(self.batch_vals["valid_loss"]) / len(self.batch_vals["valid_loss"])
+        return sum(self.batch_vals["valid_loss"]) / len(
+            self.batch_vals["valid_loss"]
+        )
 
     def train_loss(self):
-        return sum(self.batch_vals["train_loss"]) / len(self.batch_vals["train_loss"])
+        return sum(self.batch_vals["train_loss"]) / len(
+            self.batch_vals["train_loss"]
+        )
 
     def _print_console(self):
         out_string = f""
@@ -246,10 +271,12 @@ class Recorder(Callback):
         for key, val in self.history.items():
             if key != "epochs":
                 if type(val[-1]) is np.ndarray:
-                    out_string += f"{key}: {np.array2string(val[-1])}\t"
+                    out_string += f"{key}: {np.array2string(val[-1], precision=4)}\t"
                 else:
                     out_string += f"{key}: {val[-1]:.4f}\t"
-        out_string += f"train_time: {self._sec_conv_str(self.learn.train_time)}\t"
+        out_string += (
+            f"train_time: {self._sec_conv_str(self.learn.train_time)}\t"
+        )
         print(out_string[:-1] + "]")
 
     def _sec_conv_str(self, time):
@@ -330,7 +357,7 @@ class Checkpoints(Callback):
             self.save_name = (
                 f"Arch-{self.learn.arch[0]}_bs-{self.learn.bs}_{self.monitor}"
             )
-  
+
         else:
             self.save_name = f""
 
@@ -353,7 +380,9 @@ class Checkpoints(Callback):
                 "train_time": self.learn.train_time,
             }
             save_checkpoint(
-                checkpoint, False, Path(self.save_path / f"model_{self.save_name}")
+                checkpoint,
+                False,
+                Path(self.save_path / f"model_{self.save_name}"),
             )
 
             if self.learn.new_best_values[self.monitor]:
@@ -376,7 +405,10 @@ class Checkpoints(Callback):
             df = pd.DataFrame(self.learn.history_raw).set_index("epochs")
             to_func = getattr(df.iloc[1:], "to_" + self.history_format)
             to_func(
-                Path(self.save_path / f"history_{self.save_name}.{self.history_format}")
+                Path(
+                    self.save_path
+                    / f"history_{self.save_name}.{self.history_format}"
+                )
             )
 
     def create_checkpoint_path(self):
@@ -430,29 +462,102 @@ class Checkpoints(Callback):
 class Tensorboard(Callback):
     def __init__(self, learn):
         super().__init__(learn)
-    
+        self.missmatch_dict = dict(
+            zip(
+                range(self.learn.data.c),
+                [[] for c in range(self.learn.data.c)],
+            )
+        )
+
     def on_train_begin(self, epochs):
         Path(self.logdir).mkdir(exist_ok=True, parents=True)
         self.writer = SummaryWriter(log_dir=self.logdir)
-        img, _, _ = next(iter(self.learn.data.train_dl))   
-        
+        img, _, _ = next(iter(self.learn.data.train_dl))
+
         img = img.to(self.learn.device)
         self.writer.add_graph(self.learn.model.to(self.learn.device), img)
-        
+
+    def on_loss_end(self, loss, out, yb, sampler_idx):
+        self.loss = loss
+        self.out = out
+        self.yb = yb
+        self.sampler_idx = sampler_idx
+
+    def on_batch_end(self):
+        _, batch_pred = torch.max(self.out.data, 1)
+        missmatch_mask = ~(batch_pred == self.yb)
+        correct_label = self.learn.data.train_dl.dataset.y[
+            self.sampler_idx[missmatch_mask]
+        ]
+        missmatch_label = batch_pred[missmatch_mask].cpu().numpy()
+        correct_sampler_idx = self.sampler_idx[missmatch_mask].cpu().numpy()
+        if type(correct_label) == np.ndarray:
+        # if type(correct_label) is not np.ndarray: correct_label = [correct_label]
+        # if type(missmatch_label) is not np.ndarray: missmatch_label = [missmatch_label]
+        # if type(correct_sampler_idx) is not np.ndarray: correct_sampler_idx = [correct_sampler_idx]
+            for correct, missmatch, sampler in zip(
+                correct_label, missmatch_label, correct_sampler_idx
+            ):
+                self.missmatch_dict[missmatch].append([correct, sampler])
+
     def on_epoch_end(self):
         hist = self.learn.history_raw
-        
+
         for key, val in hist.items():
             epoch = hist["epochs"][-1]
             if key != "epochs":
                 if "loss" in key:
-                    self.writer.add_scalars("loss/" + key, {"0": val[-1]}, epoch)
-                if ("acc" in key) and (not "per_class" in key):
-                    self.writer.add_scalars("acc/" + key,{"0": val[-1]}, epoch)
+                    self.writer.add_scalars(
+                        "loss/" + key, {"0": val[-1]}, epoch
+                    )
+                if ("acc" in key) and not ("per_class" in key):
+                    self.writer.add_scalars(
+                        "acc/" + key, {"0": val[-1]}, epoch
+                    )
                 if "per_class" in key:
-                    to_add = dict(zip(np.arange(self.learn.data.c).astype(str), val[-1]))
+                    to_add = dict(
+                        zip(np.arange(self.learn.data.c).astype(str), val[-1])
+                    )
                     self.writer.add_scalars("acc/" + key, to_add, epoch)
-        
+
+        img_grid, classes_list = self._show_missmatch_dict()
+        self.writer.add_image(f"truth label from top to bottom: {classes_list}", img_grid)
+    
+    def _show_missmatch_dict(self):
+        if self.show_img_per_class:
+            num_of_each_class = self.show_img_per_class
+        else:
+            num_of_each_class = 1
+
+        img_dim = self.learn.data.train_dl.dataset[0][0].shape
+        num_classes = self.learn.data.c
+        plot_tensor = torch.zeros(num_classes*num_of_each_class , *img_dim)
+
+        for i, (key, value) in enumerate(self.missmatch_dict.items()):
+            sampler = np.array(value)
+            length = len(sampler)
+            random_idx = np.arange(length)
+            np.random.shuffle(random_idx)
+            sampler_idx = sampler[random_idx][:num_of_each_class,:num_of_each_class].T
+            for j, img_idx in enumerate(sampler_idx[1]):
+                img = self.learn.data.train_dl.dataset[img_idx][0]
+                try:
+                    self.learn.config_file["s_t_Normalize"]
+                    mean, std = self.learn.config_file["s_t_Normalize"]
+                    un_mean = [-m/s for m, s in zip(mean, std)]
+                    un_std = [1/s for s in std]
+                    img = transforms.Normalize(un_mean, un_std)(img)
+                except:
+                    pass
+                plot_tensor[i*num_of_each_class + j] = img
+
+        self.plot_tensor = plot_tensor
+        img_grid = make_grid(plot_tensor, nrow=num_of_each_class)
+
+        classes_list = list(range(self.learn.data.c))
+
+        return img_grid, classes_list
+
 def save_checkpoint(state, is_best, checkpoint_path):
     """save best and last pytorch model in checkpoint_path
 
@@ -494,7 +599,12 @@ def get_callbacks(setup_config, learn):
     Returns:
         list: returns list of all callback classes
     """
-    implemented_cbs = {"r": "Recorder", "e": "EarlyStopping", "c": "Checkpoints", "t": "Tensorboard"}
+    implemented_cbs = {
+        "r": "Recorder",
+        "e": "EarlyStopping",
+        "c": "Checkpoints",
+        "t": "Tensorboard",
+    }
 
     cb_list = [c for c in setup_config if c[:2] == "c_"]
 

@@ -1,36 +1,122 @@
 import torch
 from torch import nn
 
+#always format: (b, c, h, w) "channel first"
+#output of layer:  floor[(input + 2*padding — kernel) / stride + 1]
+class ResBlock(nn.Module):
+    def __init__(self, n_in, n_out, downsample):
+        super().__init__()
+        if downsample:
+            self.conv1 = nn.Conv2d(n_in, n_out, kernel_size=3, stride=2, padding=1)
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(n_in, n_out, kernel_size=1, stride=2),
+                nn.BatchNorm2d(n_out)
+            )
+        else:
+            self.conv1 = nn.Conv2d(n_in, n_out, kernel_size=3, stride=1, padding=1)
+            self.shortcut = nn.Sequential()
+        
+        self.conv2 = nn.Conv2d(n_out, n_out, kernel_size=3, stride=1, padding=1)
+        self.bn1 = nn.BatchNorm2d(n_out)
+        self.bn2 = nn.BatchNorm2d(n_out)
 
-class InceptionModule(nn.Module):
-    def __init__(self, in_channels, out_channels, *args):
-        super(InceptionModule, self).__init__()
-        relu = nn.ReLU()
-        self.branch1 = nn.Sequential(
-                  nn.Conv2d(in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0),
-                  relu)
-
-        conv3_1 = nn.Conv2d(in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
-        conv3_3 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.branch2 = nn.Sequential(conv3_1, conv3_3,relu)
-
-        conv5_1 = nn.Conv2d(in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
-        conv5_5 = nn.Conv2d(out_channels, out_channels, kernel_size=5, stride=1, padding=2)
-        self.branch3 = nn.Sequential(conv5_1,conv5_5,relu)
-
-        max_pool_1 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
-        conv_max_1 = nn.Conv2d(in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
-        self.branch4 = nn.Sequential(max_pool_1, conv_max_1,relu)
-
-    def forward(self, input):
-        output1 = self.branch1(input)
-        output2 = self.branch2(input)
-        output3 = self.branch3(input)
-        output4 = self.branch4(input)
-        out = torch.cat([output1, output2, output3, output4], dim=1)
-        print(out.shape)
+    def forward(self, x):
+        shortcut = self.shortcut(x)
+        x = nn.ReLU()(self.bn1(self.conv1(x)))
+        x = nn.ReLU()(self.bn2(self.conv2(x)))
+        out = nn.ReLU()(x + shortcut)
         return out
 
+class ResNet18(nn.Module):
+    def __init__(self, n_in, n_out, *args):
+        super().__init__()
+        self.layer0 = nn.Sequential(
+            nn.Conv2d(n_in, 64, kernel_size=7, stride=2, padding=3),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU()
+        )
+        self.layer1 = nn.Sequential(
+            ResBlock(64, 64, downsample=False),
+            ResBlock(64, 64, downsample=False)
+        )
+        self.layer2 = nn.Sequential(
+            ResBlock(64, 128, downsample=True),
+            ResBlock(128, 128, downsample=False)
+        )
+        self.layer3 = nn.Sequential(
+            ResBlock(128, 256, downsample=True),
+            ResBlock(256, 256, downsample=False)
+        )
+        self.layer4 = nn.Sequential(
+            ResBlock(256, 512, downsample=True),
+            ResBlock(512, 512, downsample=False)
+        )
+
+        self.gap = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(512, n_out)
+        )
+
+    def forward(self, x):
+        x = self.layer0(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.gap(x)
+        out = self.fc(x)
+        return out
+
+class ResNet34(nn.Module):
+    def __init__(self, n_in, n_out, *args):
+        super().__init__()
+        self.layer0 = nn.Sequential(
+            nn.Conv2d(n_in, 64, kernel_size=7, stride=2, padding=3),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU()
+        )
+        self.layer1 = nn.Sequential(
+            ResBlock(64, 64, downsample=False),
+            ResBlock(64, 64, downsample=False),
+            ResBlock(64, 64, downsample=False),
+        )
+        self.layer2 = nn.Sequential(
+            ResBlock(64, 128, downsample=True),
+            ResBlock(128, 128, downsample=False),
+            ResBlock(128, 128, downsample=False),
+            ResBlock(128, 128, downsample=False),
+        )
+        self.layer3 = nn.Sequential(
+            ResBlock(128, 256, downsample=True),
+            ResBlock(256, 256, downsample=False),
+            ResBlock(256, 256, downsample=False),
+            ResBlock(256, 256, downsample=False),
+            ResBlock(256, 256, downsample=False),
+            ResBlock(256, 256, downsample=False),
+        )
+        self.layer4 = nn.Sequential(
+            ResBlock(256, 512, downsample=True),
+            ResBlock(512, 512, downsample=False),
+            ResBlock(512, 512, downsample=False),
+        )
+        self.gap = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(512, n_out)
+        )
+
+    def forward(self, x):
+        x = self.layer0(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.gap(x)
+        out = self.fc(x)
+        return out
 
 class CustomModel(nn.Module):
     def __init__(self, n_in, n_out, nh, img_size, num_blocks, kernel_size=3, stride=1, padding=1):    
@@ -70,7 +156,7 @@ def conv_block(img_size, n_in, nh, kernel_size, stride, padding, max_kernel=2):
     output_size = conv_output_size(output_size, k=max_kernel, p=0, s=max_kernel)
     return modules, int(output_size)
 
-def get_model(data, arch, lr, opt, device):
+def get_model(data, arch, lr, opt, device, ext_model=None):
     data_shape = data.train_dl.dataset[0][0].shape
     n_in = data_shape[0]
     nh = arch[2]
@@ -81,49 +167,11 @@ def get_model(data, arch, lr, opt, device):
     
     img_shape = data_shape[1]
     optim = getattr(torch.optim, opt)
-    
-    net = globals()[arch_model](n_in, n_out, nh, img_shape, arch_depth).to(device)
+    if not ext_model:
+        net = globals()[arch_model](n_in, n_out, nh, img_shape, arch_depth).to(device)
+    else:
+        num_ftrs = ext_model.fc.in_features
+        ext_model.fc = nn.Linear(num_ftrs, n_out)
+        net = ext_model.to(device)
     return net, optim(net.parameters(), lr=lr)
 
-class AlexNet(nn.Module):
-    def __init__(self, n_in, n_out, nh, img_size, num_blocks, kernel_size=3, stride=1, padding=1) -> None:
-        super(AlexNet, self).__init__()
-        self. n_in = n_in
-        self.c = n_out
-
-        self.features = nn.Sequential(
-            nn.Conv2d(n_in, 64, kernel_size=11, stride=4, padding=2),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-
-            nn.Conv2d(64, 192, kernel_size=5, padding=2),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-
-            nn.Conv2d(192, 384, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-
-            nn.Conv2d(384, 256, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-
-            nn.Conv2d(256, 256, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-        )   
-        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
-        self.classifier = nn.Sequential(
-            nn.Dropout(),
-            nn.Linear(256 * 6 * 6, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(inplace=True),
-            nn.Linear(4096, self.c),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.features(x)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.classifier(x)
-        return x
