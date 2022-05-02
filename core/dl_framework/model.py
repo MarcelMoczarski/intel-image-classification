@@ -157,6 +157,7 @@ def conv_block(img_size, n_in, nh, kernel_size, stride, padding, max_kernel=2):
     return modules, int(output_size)
 
 def get_model(data, arch, lr, opt, device, ext_model=None):
+    # TODO: add variable for option to train model with fixed layers
     data_shape = data.train_dl.dataset[0][0].shape
     n_in = data_shape[0]
     nh = arch[2]
@@ -170,8 +171,16 @@ def get_model(data, arch, lr, opt, device, ext_model=None):
     if not ext_model:
         net = globals()[arch_model](n_in, n_out, nh, img_shape, arch_depth).to(device)
     else:
-        num_ftrs = ext_model.fc.in_features
-        ext_model.fc = nn.Linear(num_ftrs, n_out)
+        # try:
+        #     num_ftrs = ext_model.fc.in_features
+        #     ext_model.fc = nn.Linear(num_ftrs, n_out)
+        #     optimizer = optim(net.parameters(), lr=lr)
+        # except: 
+        num_ftrs = ext_model.classifier[-1].in_features
+        ext_model.classifier[-1] = nn.Linear(num_ftrs, n_out)
+        for param in ext_model.features.parameters():
+            param.requires_grad = False
+        optimizer = optim(filter(lambda p: p.requires_grad, ext_model.parameters()), lr=lr)
         net = ext_model.to(device)
-    return net, optim(net.parameters(), lr=lr)
+    return net, optimizer
 
